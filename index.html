@@ -97,6 +97,9 @@ label.fld input,label.fld select,label.fld textarea{padding:8px 10px;border:1px 
 .btn.primary:hover:not(:disabled){filter:brightness(1.05)}
 .btn:disabled{opacity:.5;cursor:not-allowed}
 .btn.danger{color:var(--bad)}
+.who{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);min-height:30px}
+.who b{color:var(--ink);font-weight:600;font-size:14px}
+.linkbtn{border:0;background:transparent;color:var(--accent);font-weight:600;padding:4px 2px;font-size:13px}
 .save{font-size:12px;color:var(--muted);margin-left:auto}
 .save.ok{color:var(--ok)} .save.err{color:var(--bad)}
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
@@ -167,9 +170,7 @@ textarea.copybox{width:100%;min-height:160px;font-family:var(--f-mono);font-size
     <section class="pane" id="p-mine">
       <div class="pane-head">
         <h2>My order</h2>
-        <label class="fld" for="myName">Your name
-          <input id="myName" type="text" maxlength="40" placeholder="So Jingwen knows who it's for" autocomplete="name">
-        </label>
+        <div class="who" id="whoRow"></div>
       </div>
       <div class="pane-body"><div id="mineBody"></div></div>
       <div class="pane-foot">
@@ -275,7 +276,29 @@ function renderMenu(){
   if(S.cat==="All" && !q || any===false) el.append(h("button",{class:"btn",style:"margin-top:14px;width:100%",disabled:dis,onclick:custom},"Can't find it? Add something else (promos, specials)"));
   if(!any) el.append(h("div",{class:"empty"},h("strong",null,"Nothing matches “"+S.q+"”"),"Try a shorter word, like “spicy” or “fries”."));
 }
+function renderWho(ed){
+  const el=$("whoRow"); el.replaceChildren();
+  if(S.name.trim()) el.append("Ordering as",h("b",null,S.name.trim()),ed?h("button",{class:"linkbtn",onclick:()=>askName(null,true)},"Change"):null);
+  else el.append("You'll be asked for your name when you add your first item.");
+}
+function askName(then,changing){
+  const layer=$("layer"); const close=()=>layer.replaceChildren();
+  const inp=h("input",{id:"whoName",type:"text",maxlength:"40",autocomplete:"name",placeholder:"e.g. Jing Song",value:S.name||""});
+  const msg=h("div",{style:"color:var(--bad);font-size:13px",hidden:true},"Please enter your name.");
+  const go=()=>{ const v=inp.value.trim(); if(!v){ msg.hidden=false; inp.focus(); return; }
+    S.name=v; store("4x-name",v); close(); renderMine(); queueSave(); if(then) then(); };
+  inp.addEventListener("keydown",e=>{ if(e.key==="Enter") go(); });
+  const ov=h("div",{class:"overlay",onclick:e=>{if(e.target===ov)close();}},
+    h("div",{class:"sheet",role:"dialog","aria-modal":"true","aria-label":"Who are you?"},
+      h("h3",null,changing?"Change your name":"Who are you?"),
+      h("div",{style:"color:var(--muted);font-size:13px"},"So Jingwen knows whose order this is. You only need to do this once."),
+      h("label",{class:"fld",for:"whoName"},"Your name",inp), msg,
+      h("div",{class:"row"},h("span",{style:"flex:1"}),h("button",{class:"btn",onclick:close},"Cancel"),h("button",{class:"btn primary",onclick:go},changing?"Save":"Continue"))));
+  layer.replaceChildren(ov); inp.focus();
+  ov.addEventListener("keydown",e=>{ if(e.key==="Escape") close(); });
+}
 function custom(){
+  if(!S.name.trim()) return askName(custom);
   const layer=$("layer"); const close=()=>layer.replaceChildren();
   const nm=h("input",{id:"ctName",type:"text",maxlength:"60",placeholder:"e.g. Prosperity Burger Meal, Ice Mountain"});
   const note=h("input",{id:"ctNote",type:"text",maxlength:"80",placeholder:"Size, drink, no ice…"});
@@ -290,6 +313,7 @@ function custom(){
   ov.addEventListener("keydown",e=>{ if(e.key==="Escape") close(); });
 }
 function pick(i){
+  if(!S.name.trim()) return askName(()=>pick(i));
   if(!i.m){ addLine({n:i.n,qty:1}); toast("Added "+i.n); return; }
   let opt="Meal (Medium)", qty=1;
   const layer=$("layer");
@@ -327,7 +351,7 @@ function addLine(l){
 function renderMine(){
   const el=$("mineBody"); el.replaceChildren();
   const ed=canEditMine();
-  $("myName").disabled=!ed;
+  renderWho(ed);
   if(S.readOnly) el.append(h("div",{class:"banner",style:"margin-bottom:10px"},"You can view this page but can't save an order on it. Build your order here, tap “Copy my order”, and send it to Jingwen on WhatsApp."));
   if(!S.lines.length){ el.append(h("div",{class:"empty"},h("strong",null,"Nothing added yet"),"Pick items from the menu. Burgers, McSpicy, nuggets and wraps can be made a meal with your choice of side and drink.")); }
   else{
@@ -471,7 +495,6 @@ function copy(text){
 function setPane(p){ S.pane=p; document.querySelectorAll("#tabs button").forEach(b=>b.setAttribute("aria-selected",String(b.dataset.p===p))); ["menu","mine","group"].forEach(x=>$("p-"+x).classList.toggle("active",x===p)); }
 $("tabs").addEventListener("click",e=>{ const b=e.target.closest("button[data-p]"); if(b) setPane(b.dataset.p); });
 $("q").addEventListener("input",e=>{ S.q=e.target.value; renderMenu(); });
-$("myName").addEventListener("input",e=>{ S.name=e.target.value; queueSave(); });
 $("clearMine").addEventListener("click",()=>{ S.lines=[]; changed(); });
 $("copyMine").addEventListener("click",()=>copy(mineText()));
 $("copyAll").addEventListener("click",()=>copy(orderText(groupOrders())));
@@ -487,16 +510,15 @@ async function refresh(){
     const d=await api("state");
     S.orders=d.orders||[]; S.config=d.config||{}; S.hasPin=!!d.hasPin; S.loaded=true; S.offline=false;
     if(first){ first=false; const mine=S.orders.find(o=>o.id===UID);
-      if(mine && !S.lines.length){ S.lines=(mine.items||[]).map(l=>({...l})); if(mine.name){ S.name=mine.name; $("myName").value=mine.name; } S.save="Saved"; }
+      if(mine && !S.lines.length){ S.lines=(mine.items||[]).map(l=>({...l})); if(mine.name){ S.name=mine.name; store("4x-name",mine.name); } S.save="Saved"; }
       renderAll(); return; }
   }catch(e){ S.offline=true; }
   renderStatus(); renderGroup(); renderOwner();
-  const typing=document.activeElement&&(document.activeElement.classList.contains("note")||document.activeElement.id==="myName");
+  const typing=document.activeElement&&(document.activeElement.classList.contains("note")||document.activeElement.id==="whoName");
   if(!typing){ renderMine(); renderMenu(); }
 }
 renderAll();
-try{ const n=store("4x-name"); if(n){ S.name=n; $("myName").value=n; } }catch(e){}
-$("myName").addEventListener("change",()=>store("4x-name",S.name.trim()));
+try{ const n=store("4x-name"); if(n){ S.name=n; renderMine(); } }catch(e){}
 refresh();
 setInterval(()=>{ if(!document.hidden) refresh(); },15000);
 document.addEventListener("visibilitychange",()=>{ if(!document.hidden) refresh(); });
