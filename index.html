@@ -1,0 +1,505 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>4X Lunch</title>
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+html,body{margin:0} [hidden]{display:none!important} img{max-width:100%}
+
+/* Layout: one-screen app. Three panes (Menu · My order · Group tally) side by side on wide screens,
+   tabbed on narrow ones. Each pane scrolls inside itself under a frozen header. Tally = kitchen tickets. */
+:root{
+  --bg:#F3F4F8; --panel:#FFFFFF; --ink:#1A1E2C; --muted:#646B80; --line:#E2E5EE;
+  --accent:#D9480F; --accent-ink:#FFFFFF; --accent-soft:#FDEBE2;
+  --amber:#B7791F; --amber-soft:#FBF1DC; --ok:#2F855A; --ok-soft:#E3F3EA; --bad:#C53030; --bad-soft:#FBE4E4;
+  --ticket:#FFFDF7; --shadow:0 1px 2px rgba(26,30,44,.06),0 4px 14px rgba(26,30,44,.06);
+  --f-display:"Bricolage Grotesque","Segoe UI",system-ui,sans-serif;
+  --f-body:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#12141C; --panel:#1B1E29; --ink:#ECEEF4; --muted:#9AA1B5; --line:#2C3040;
+  --accent:#FF7A3D; --accent-ink:#1A0E06; --accent-soft:#3A2419;
+  --amber:#F0B44C; --amber-soft:#3A2E17; --ok:#5CC28C; --ok-soft:#173226; --bad:#F27474; --bad-soft:#3A1C1F;
+  --ticket:#20232F; --shadow:0 1px 2px rgba(0,0,0,.3),0 4px 14px rgba(0,0,0,.25); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#12141C; --panel:#1B1E29; --ink:#ECEEF4; --muted:#9AA1B5; --line:#2C3040;
+  --accent:#FF7A3D; --accent-ink:#1A0E06; --accent-soft:#3A2419;
+  --amber:#F0B44C; --amber-soft:#3A2E17; --ok:#5CC28C; --ok-soft:#173226; --bad:#F27474; --bad-soft:#3A1C1F;
+  --ticket:#20232F; --shadow:0 1px 2px rgba(0,0,0,.3),0 4px 14px rgba(0,0,0,.25); color-scheme:dark}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.45}
+*{box-sizing:border-box}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.app{height:100%;display:flex;flex-direction:column;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:14px;gap:12px;max-width:1440px;margin:0 auto}
+header.top{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.brand{display:flex;align-items:baseline;gap:10px;min-width:0}
+.brand h1{font-family:var(--f-display);font-weight:800;font-size:26px;margin:0;letter-spacing:-.01em}
+.brand h1 b{color:var(--accent)}
+.brand span{color:var(--muted);font-size:13px}
+.status{margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:600;background:var(--line);color:var(--muted);white-space:nowrap}
+.pill.open{background:var(--ok-soft);color:var(--ok)} .pill.closed{background:var(--bad-soft);color:var(--bad)} .pill.warn{background:var(--amber-soft);color:var(--amber)}
+.pill i{width:7px;height:7px;border-radius:50%;background:currentColor;display:inline-block}
+.tabs{display:none;gap:6px;background:var(--panel);padding:4px;border-radius:10px;border:1px solid var(--line)}
+.tabs button{flex:1;border:0;background:transparent;padding:8px 6px;border-radius:7px;font-weight:600;color:var(--muted);display:flex;gap:6px;justify-content:center;align-items:center}
+.tabs button[aria-selected="true"]{background:var(--accent);color:var(--accent-ink)}
+.tabs .n{font-family:var(--f-mono);font-size:11px;padding:0 6px;border-radius:999px;background:var(--line);color:var(--ink)}
+.tabs button[aria-selected="true"] .n{background:rgba(255,255,255,.25);color:inherit}
+.grid{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr) minmax(0,1.1fr);gap:12px}
+.pane{background:var(--panel);border:1px solid var(--line);border-radius:12px;display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden}
+.pane-head{padding:12px 14px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:10px;background:var(--panel)}
+.pane-head h2{margin:0;font-family:var(--f-display);font-weight:600;font-size:17px;display:flex;align-items:center;gap:8px}
+.pane-head h2 small{font-family:var(--f-body);font-weight:500;color:var(--muted);font-size:12px}
+.pane-body{flex:1;overflow:auto;min-height:0;padding:12px 14px}
+.pane-foot{border-top:1px solid var(--line);padding:10px 14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.search{width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg)}
+.cats{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:thin}
+.cats button{flex:none;border:1px solid var(--line);background:transparent;padding:5px 11px;border-radius:999px;font-size:12.5px;font-weight:500;color:var(--muted)}
+.cats button[aria-pressed="true"]{border-color:var(--ink);background:var(--ink);color:var(--panel)}
+.cat-title{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600;margin:14px 0 8px}
+.cat-title:first-child{margin-top:0}
+.items{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px}
+.item{position:relative;text-align:left;border:1px solid var(--line);background:var(--panel);border-radius:9px;padding:10px 11px;display:flex;flex-direction:column;gap:4px;min-height:58px;transition:border-color .12s,transform .12s}
+.item:hover:not(:disabled){border-color:var(--accent)}
+.item:active:not(:disabled){transform:scale(.98)}
+.item:disabled{opacity:.5;cursor:not-allowed}
+.item .nm{font-weight:600;font-size:13.5px;line-height:1.3;padding-right:22px}
+.item .tag{font-size:11.5px;color:var(--muted)}
+.item .plus{position:absolute;top:8px;right:8px;width:20px;height:20px;border-radius:6px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;font-weight:700;font-size:14px;line-height:1}
+.item .have{position:absolute;top:8px;right:8px;min-width:20px;height:20px;border-radius:6px;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font-family:var(--f-mono);font-weight:700;font-size:11px;padding:0 5px}
+label.fld{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);font-weight:500}
+label.fld input,label.fld select,label.fld textarea{padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font-size:14px}
+.lines{display:flex;flex-direction:column;gap:8px}
+.line{border:1px solid var(--line);border-radius:9px;padding:9px 10px;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:4px 10px;align-items:center}
+.qty{display:flex;align-items:center;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+.qty button{border:0;background:transparent;width:26px;height:26px;font-weight:700;color:var(--muted)}
+.qty button:hover{background:var(--bg);color:var(--ink)}
+.qty span{font-family:var(--f-mono);font-weight:700;min-width:20px;text-align:center;font-size:13px}
+.line .t{font-weight:600;min-width:0}
+.line .o{font-size:12px;color:var(--muted)}
+.line input.note{grid-column:2/4;padding:6px 9px;border:1px dashed var(--line);border-radius:7px;background:transparent;font-size:12.5px}
+.x{border:0;background:transparent;color:var(--muted);font-size:18px;line-height:1;width:26px;height:26px;border-radius:6px}
+.x:hover{background:var(--bad-soft);color:var(--bad)}
+.empty{border:1.5px dashed var(--line);border-radius:10px;padding:22px 16px;text-align:center;color:var(--muted);display:flex;flex-direction:column;gap:6px;align-items:center}
+.empty strong{color:var(--ink);font-family:var(--f-display);font-weight:600;font-size:15px}
+.btn{border:1px solid var(--line);background:var(--panel);padding:8px 13px;border-radius:8px;font-weight:600;font-size:13px}
+.btn:hover:not(:disabled){border-color:var(--ink)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.primary:hover:not(:disabled){filter:brightness(1.05)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn.danger{color:var(--bad)}
+.save{font-size:12px;color:var(--muted);margin-left:auto}
+.save.ok{color:var(--ok)} .save.err{color:var(--bad)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{border:0;background:transparent;padding:6px 11px;font-size:12.5px;font-weight:600;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--panel)}
+.ticket{background:var(--ticket);border:1px solid var(--line);border-radius:4px;padding:12px 14px;font-family:var(--f-mono);font-size:12.5px;position:relative;box-shadow:var(--shadow)}
+.ticket::after{content:"";position:absolute;left:0;right:0;bottom:-6px;height:6px;background:radial-gradient(circle at 5px -1px,transparent 5px,var(--ticket) 5.5px) repeat-x;background-size:10px 6px}
+.trow{display:grid;grid-template-columns:3.2em minmax(0,1fr);gap:4px 6px;padding:5px 0;border-bottom:1px dotted var(--line)}
+.trow:last-child{border-bottom:0}
+.trow .c{font-weight:700;color:var(--accent);font-variant-numeric:tabular-nums}
+.trow .d{min-width:0}
+.trow .w{grid-column:2;font-family:var(--f-body);font-size:11.5px;color:var(--muted)}
+.tstat{display:flex;gap:14px;font-family:var(--f-body);font-size:12px;color:var(--muted);margin-bottom:8px;padding-bottom:8px;border-bottom:1px dashed var(--line)}
+.tstat b{font-family:var(--f-mono);color:var(--ink);font-size:15px}
+.people{display:flex;flex-direction:column;gap:8px;margin-top:18px}
+.person{border:1px solid var(--line);border-radius:9px;padding:9px 11px}
+.person .ph{display:flex;align-items:center;gap:8px}
+.person .ph b{font-weight:600}
+.person .ph small{color:var(--muted);font-size:11.5px}
+.person .ph .sp{margin-left:auto;display:flex;gap:6px;align-items:center}
+.person ul{margin:6px 0 0;padding-left:18px;font-size:12.5px;color:var(--ink)}
+.person ul li span{color:var(--muted)}
+.me-tag{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;background:var(--accent-soft);color:var(--accent);padding:1px 6px;border-radius:4px}
+.mini{border:1px solid var(--line);background:transparent;border-radius:6px;padding:3px 8px;font-size:11.5px;font-weight:600;color:var(--muted)}
+.mini.confirm{border-color:var(--bad);color:var(--bad)}
+.owner{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;padding:10px;border-radius:9px;background:var(--amber-soft)}
+.owner .lbl{width:100%;font-size:11px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;color:var(--amber)}
+.owner input{padding:6px 8px;border:1px solid var(--line);border-radius:7px;background:var(--panel);color:var(--ink);font-size:13px}
+.banner{padding:9px 12px;border-radius:9px;font-size:13px;background:var(--amber-soft);color:var(--ink);border:1px solid var(--line)}
+.banner.bad{background:var(--bad-soft)}
+.overlay{position:fixed;inset:0;background:rgba(10,12,20,.45);display:grid;place-items:end center;z-index:50;padding:16px;padding-bottom:max(16px,env(safe-area-inset-bottom,0px))}
+@media (min-width:640px){.overlay{place-items:center}}
+.sheet{background:var(--panel);border-radius:14px;width:min(440px,100%);padding:16px;display:flex;flex-direction:column;gap:12px;box-shadow:0 10px 40px rgba(0,0,0,.3);max-height:90%;overflow:auto}
+.sheet h3{margin:0;font-family:var(--f-display);font-weight:600;font-size:19px;text-wrap:balance}
+.sheet .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.toast{position:fixed;left:50%;bottom:max(18px,calc(env(safe-area-inset-bottom,0px) + 12px));transform:translateX(-50%);background:var(--ink);color:var(--panel);padding:8px 14px;border-radius:8px;font-size:13px;font-weight:500;z-index:60;box-shadow:var(--shadow)}
+textarea.copybox{width:100%;min-height:160px;font-family:var(--f-mono);font-size:12px;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg)}
+@media (max-width:1000px){
+  .tabs{display:flex}
+  .grid{grid-template-columns:minmax(0,1fr)}
+  .pane{display:none} .pane.active{display:flex}
+  .brand h1{font-size:22px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header class="top">
+    <div class="brand"><h1><b>4X</b> Lunch</h1><span>Monday · McDelivery · Jingwen's treat</span></div>
+    <div class="status" id="status"></div>
+  </header>
+  <nav class="tabs" id="tabs" role="tablist">
+    <button role="tab" data-p="menu" aria-selected="true">Menu</button>
+    <button role="tab" data-p="mine" aria-selected="false">My order <span class="n" id="nMine">0</span></button>
+    <button role="tab" data-p="group" aria-selected="false">Group <span class="n" id="nGroup">0</span></button>
+  </nav>
+  <main class="grid">
+    <section class="pane active" id="p-menu">
+      <div class="pane-head">
+        <h2>Menu <small>Tap an item to add it</small></h2>
+        <input class="search" id="q" type="search" placeholder="Search, e.g. McSpicy, McFlurry, Milo" autocomplete="off">
+        <div class="cats" id="cats"></div>
+      </div>
+      <div class="pane-body" id="menuBody"></div>
+    </section>
+    <section class="pane" id="p-mine">
+      <div class="pane-head">
+        <h2>My order</h2>
+        <label class="fld" for="myName">Your name
+          <input id="myName" type="text" maxlength="40" placeholder="So Jingwen knows who it's for" autocomplete="name">
+        </label>
+      </div>
+      <div class="pane-body"><div id="mineBody"></div></div>
+      <div class="pane-foot">
+        <button class="btn" id="copyMine">Copy my order</button>
+        <button class="btn danger" id="clearMine">Clear</button>
+        <span class="save" id="saveState"></span>
+      </div>
+    </section>
+    <section class="pane" id="p-group">
+      <div class="pane-head">
+        <h2>Group tally <small id="groupSub"></small></h2>
+        <div id="ownerBox"></div>
+      </div>
+      <div class="pane-body" id="groupBody"></div>
+      <div class="pane-foot">
+        <button class="btn primary" id="copyAll">Copy order for McDelivery</button>
+        <button class="btn" id="orgBtn" style="margin-left:auto">Organiser</button>
+      </div>
+    </section>
+  </main>
+</div>
+<div id="layer"></div>
+
+<script>
+(() => {
+const MEAL_OPTS = ["À la carte","Meal (Medium)","Meal (Large)"];
+const SIDES = ["French Fries","Corn","Garden Side Salad"];
+const DRINKS = [
+ ["Soft drinks",["Coca-Cola® Less Sugar","Coca-Cola® Zero Sugar","Sprite®"]],
+ ["Iced",["Iced MILO®","Iced Lemon Tea","Jasmine Green Tea","Ice Mountain Water"]],
+ ["Hot",["Hot MILO®","Hot Tea","McCafé® Premium Roast Coffee"]],
+ ["Milk & juice",["Low-Fat Hi-Calcium Milk","Kiyo Grape Juice","Oatside Original Oatmilk","Oatside Chocolate Oatmilk"]],
+ ["McCafé® (top-up may apply)",["McCafé® Americano","McCafé® Iced Americano","McCafé® Cappuccino","McCafé® Latte","McCafé® Iced Latte"]]
+];
+// m = can be made a meal with fries + drink
+const MENU = [
+ ["Burgers",[["Big Mac®",1],["Quarter Pounder® with Cheese",1],["Double Quarter Pounder® with Cheese",1],["Cheeseburger",1],["Double Cheeseburger",1],["Triple Cheeseburger",1],["Hamburger",1],["Smoky Beef Burger",1],["Double Smoky Beef Burger",1]]],
+ ["Chicken & Fish",[["McSpicy®",1],["Double McSpicy®",1],["McSpicy® with Cheese",1],["Double McSpicy® with Cheese",1],["McSpicy® B.L.T",1],["McChicken®",1],["Double McChicken®",1],["McChicken® with Cheese",1],["McChicken® B.L.T",1],["Buttermilk Crispy Chicken",1],["Filet-O-Fish®",1],["Double Filet-O-Fish®",1]]],
+ ["McCrispy™ & Nuggets",[["McCrispy™ Fried Chicken Signature (2pc)",1],["McCrispy™ Fried Chicken Spicy (2pc)",1],["McCrispy™ Fried Chicken Signature (6pc)"],["McCrispy™ Fried Chicken Spicy (6pc)"],["McCrispy™ Fried Chicken Mix (6pc)"],["McCrispy™ Signature (6pc) Bundle"],["McCrispy™ Spicy (6pc) Bundle"],["McCrispy™ Mix (6pc) Bundle"],["Chicken McNuggets® (6pc)",1],["Chicken McNuggets® (9pc)",1],["Chicken McNuggets® (20pc)"],["McWings® (2pc)"],["McWings® (4pc)"]]],
+ ["Wraps & Salads",[["Buttermilk Chicken McWrap®",1],["Spicy Chicken McWrap®",1],["Buttermilk Chicken Salad"],["Garden Side Salad"]]],
+ ["Sharing & Family",[["4pc Saver Meal"],["Happy Sharing Box® A"],["Happy Sharing Box® B"],["Family Meal (Cheeseburger)"],["Family Meal (McNuggets®)"],["Cheeseburger Happy Meal®"],["Chicken McNuggets® (4pc) Happy Meal®"]]],
+ ["Sides",[["French Fries (Small)"],["French Fries (Medium)"],["French Fries (Large)"],["Corn (Jr)"],["Corn"],["Hash Brown"]]],
+ ["Desserts",[["OREO® McFlurry®"],["Strawberry OREO® McFlurry®"],["Hot Fudge Sundae"],["Strawberry Sundae"],["Strawberry Hot Fudge Sundae"],["Strawberry Bliss Sundae"],["Apple Pie"],["Vanilla Cone"],["Strawberry Cone"],["ChocoCone®"],["Strawberry ChocoCone®"]]],
+ ["Drinks",[["Coca-Cola® Less Sugar (S)"],["Coca-Cola® Less Sugar (M)"],["Coca-Cola® Less Sugar (L)"],["Coca-Cola® Zero Sugar (S)"],["Coca-Cola® Zero Sugar (M)"],["Coca-Cola® Zero Sugar (L)"],["Sprite® (S)"],["Sprite® (M)"],["Sprite® (L)"],["Iced MILO® (S)"],["Iced MILO® (M)"],["Hot MILO®"],["Iced Lemon Tea (S)"],["Iced Lemon Tea (M)"],["Jasmine Green Tea (S)"],["Jasmine Green Tea (M)"],["Ice Mountain Water"],["Low-Fat Hi-Calcium Milk"],["Kiyo Grape Juice"],["Oatside Original Oatmilk"],["Oatside Chocolate Oatmilk"],["Hot Tea"]]],
+ ["McCafé®",[["McCafé® Premium Roast Coffee"],["McCafé® Americano"],["McCafé® Iced Americano"],["McCafé® Cappuccino"],["McCafé® Latte"],["McCafé® Iced Latte"],["Mocha Frappé"],["Caramel Frappé"],["Double Chocolate Frappé"]]],
+ ["Sauces",[["Curry Sauce"],["Barbeque Sauce"],["Honey Mustard Sauce"]]]
+];
+const ITEMS = []; MENU.forEach(([cat,list])=>list.forEach(([n,m])=>ITEMS.push({cat,n,m:!!m})));
+
+function store(k,v){ try{ if(v===undefined) return localStorage.getItem(k); localStorage.setItem(k,v); }catch(e){ return null; } }
+function rid(n){ const a=new Uint8Array(n); crypto.getRandomValues(a); return Array.from(a,b=>"abcdefghijkmnpqrstuvwxyz23456789"[b%32]).join(""); }
+let UID=store("4x-id"), TOKEN=store("4x-token");
+if(!UID||!TOKEN){ UID=rid(16); TOKEN=rid(32); store("4x-id",UID); store("4x-token",TOKEN); }
+let ORGPIN=null; try{ ORGPIN=sessionStorage.getItem("4x-org"); }catch(e){}
+const S = { cat:"All", q:"", pane:"menu", name:"", lines:[], orders:[], config:{}, uid:UID, isOwner:!!ORGPIN, readOnly:false, loaded:false, offline:false, saving:false, pending:false, save:"", confirmDel:null, hasPin:true, serverClosed:false };
+const $ = id => document.getElementById(id);
+function h(tag, attrs, ...kids){ const e=document.createElement(tag); if(attrs) for(const k in attrs){ const v=attrs[k]; if(v==null||v===false) continue; if(k==="class") e.className=v; else if(k.startsWith("on")) e.addEventListener(k.slice(2),v); else if(k==="text") e.textContent=v; else e.setAttribute(k,v===true?"":v);} for(const c of kids.flat()){ if(c==null||c===false) continue; e.append(c.nodeType?c:document.createTextNode(String(c))); } return e; }
+function toast(msg){ const t=h("div",{class:"toast",role:"status",text:msg}); document.body.append(t); setTimeout(()=>t.remove(),1800); }
+const lineKey = l => [l.n,l.opt||"",l.side||"",l.drink||""].join("|");
+const optText = l => l.opt && l.opt!=="À la carte" ? [l.opt,l.side,l.drink].filter(Boolean).join(" · ") : "";
+
+function cutoffDate(){ const c=S.config.cutoff; if(!c) return null; const d=new Date(c); return isNaN(d)?null:d; }
+function isClosed(){ if(S.config.locked) return true; const d=cutoffDate(); return !!(d && Date.now()>d.getTime()); }
+function canEditMine(){ return !isClosed() || S.isOwner; }
+function fmtCut(d){ return d.toLocaleString("en-SG",{weekday:"short",day:"numeric",month:"short",hour:"numeric",minute:"2-digit"}); }
+
+/* ---------- header ---------- */
+function renderStatus(){
+  const el=$("status"); el.replaceChildren();
+  const d=cutoffDate();
+  if(isClosed()) el.append(h("span",{class:"pill closed"},h("i"),"Orders closed"));
+  else el.append(h("span",{class:"pill open"},h("i"),"Orders open"));
+  el.append(h("span",{class:"pill "+(d?"":"warn")}, d?"Cut-off "+fmtCut(d):"Cut-off: Monday morning, time to be set"));
+  const n=S.orders.filter(o=>(o.items||[]).length).length;
+  el.append(h("span",{class:"pill"}, n+(n===1?" person":" people")+" in"));
+}
+
+/* ---------- menu ---------- */
+function renderCats(){
+  const el=$("cats"); el.replaceChildren();
+  ["All",...MENU.map(m=>m[0])].forEach(c=>el.append(h("button",{"aria-pressed":String(S.cat===c),onclick:()=>{S.cat=c;renderCats();renderMenu();$("menuBody").scrollTop=0;}},c)));
+}
+function myCount(n){ return S.lines.filter(l=>l.n===n).reduce((a,l)=>a+l.qty,0); }
+function renderMenu(){
+  const el=$("menuBody"); el.replaceChildren();
+  const q=S.q.trim().toLowerCase();
+  const dis=!canEditMine();
+  if(isClosed() && !S.isOwner) el.append(h("div",{class:"banner bad",style:"margin-bottom:12px"},"Orders are closed. Jingwen is placing the order now. Check the Group tab for the final list."));
+  let any=false;
+  MENU.forEach(([cat])=>{
+    if(S.cat!=="All" && S.cat!==cat) return;
+    const list=ITEMS.filter(i=>i.cat===cat && (!q || i.n.toLowerCase().includes(q)));
+    if(!list.length) return; any=true;
+    el.append(h("div",{class:"cat-title"},cat));
+    const g=h("div",{class:"items"});
+    list.forEach(i=>{ const c=myCount(i.n);
+      g.append(h("button",{class:"item",disabled:dis,onclick:()=>pick(i),"aria-label":"Add "+i.n},
+        h("span",{class:"nm"},i.n), i.m?h("span",{class:"tag"},"Can be a meal"):null,
+        c?h("span",{class:"have"},c):h("span",{class:"plus","aria-hidden":"true"},"+")));
+    });
+    el.append(g);
+  });
+  if(S.cat==="All" && !q || any===false) el.append(h("button",{class:"btn",style:"margin-top:14px;width:100%",disabled:dis,onclick:custom},"Can't find it? Add something else (promos, specials)"));
+  if(!any) el.append(h("div",{class:"empty"},h("strong",null,"Nothing matches “"+S.q+"”"),"Try a shorter word, like “spicy” or “fries”."));
+}
+function custom(){
+  const layer=$("layer"); const close=()=>layer.replaceChildren();
+  const nm=h("input",{id:"ctName",type:"text",maxlength:"60",placeholder:"e.g. Prosperity Burger Meal, Ice Mountain"});
+  const note=h("input",{id:"ctNote",type:"text",maxlength:"80",placeholder:"Size, drink, no ice…"});
+  const ov=h("div",{class:"overlay",onclick:e=>{if(e.target===ov)close();}},
+    h("div",{class:"sheet",role:"dialog","aria-modal":"true","aria-label":"Add something else"},
+      h("h3",null,"Add something else"),
+      h("label",{class:"fld",for:"ctName"},"Item, as named on McDelivery",nm),
+      h("label",{class:"fld",for:"ctNote"},"Details (optional)",note),
+      h("div",{class:"row"},h("span",{style:"flex:1"}),h("button",{class:"btn",onclick:close},"Cancel"),
+        h("button",{class:"btn primary",onclick:()=>{ const v=nm.value.trim(); if(!v){nm.focus();return;} addLine({n:v,qty:1,note:note.value.trim()}); close(); toast("Added "+v);}},"Add to order"))));
+  layer.replaceChildren(ov); nm.focus();
+  ov.addEventListener("keydown",e=>{ if(e.key==="Escape") close(); });
+}
+function pick(i){
+  if(!i.m){ addLine({n:i.n,qty:1}); toast("Added "+i.n); return; }
+  let opt="Meal (Medium)", qty=1;
+  const layer=$("layer");
+  const close=()=>layer.replaceChildren();
+  const drinkSel=h("select",{id:"pkDrink"},DRINKS.map(([g,l])=>h("optgroup",{label:g},l.map(d=>h("option",{value:d},d)))));
+  const sideSel=h("select",{id:"pkSide"},SIDES.map(d=>h("option",{value:d},d)));
+  const drinkFld=h("div",{class:"row",style:"align-items:stretch"},
+    h("label",{class:"fld",for:"pkSide",style:"flex:1;min-width:140px"},"Side",sideSel),
+    h("label",{class:"fld",for:"pkDrink",style:"flex:1.4;min-width:170px"},"Drink",drinkSel));
+  const seg=h("div",{class:"seg",role:"group","aria-label":"Meal option"});
+  const qn=h("span",null,"1");
+  const note=h("input",{id:"pkNote",type:"text",maxlength:"80",placeholder:"e.g. no ice, no pickles"});
+  function paintSeg(){ seg.replaceChildren(...MEAL_OPTS.map(o=>h("button",{"aria-pressed":String(o===opt),onclick:()=>{opt=o;paintSeg();}},o))); drinkFld.hidden = opt==="À la carte"; }
+  paintSeg();
+  const ov=h("div",{class:"overlay",onclick:e=>{if(e.target===ov)close();}},
+    h("div",{class:"sheet",role:"dialog","aria-modal":"true","aria-label":i.n},
+      h("h3",null,i.n), seg, drinkFld,
+      h("label",{class:"fld",for:"pkNote"},"Note (optional)",note),
+      h("div",{class:"row"},
+        h("div",{class:"qty"},h("button",{"aria-label":"Less",onclick:()=>{qty=Math.max(1,qty-1);qn.textContent=qty;}},"−"),qn,h("button",{"aria-label":"More",onclick:()=>{qty=Math.min(20,qty+1);qn.textContent=qty;}},"+")),
+        h("span",{style:"flex:1"}),
+        h("button",{class:"btn",onclick:close},"Cancel"),
+        h("button",{class:"btn primary",onclick:()=>{ addLine({n:i.n,qty,opt,side:opt==="À la carte"?"":sideSel.value,drink:opt==="À la carte"?"":drinkSel.value,note:note.value.trim()}); close(); toast("Added "+i.n);}},"Add to order"))));
+  layer.replaceChildren(ov);
+  ov.querySelector(".seg button[aria-pressed=true]").focus();
+  ov.addEventListener("keydown",e=>{ if(e.key==="Escape") close(); });
+}
+
+/* ---------- my order ---------- */
+function addLine(l){
+  const k=lineKey(l); const ex=S.lines.find(x=>lineKey(x)===k && (x.note||"")===(l.note||""));
+  if(ex) ex.qty=Math.min(20,ex.qty+l.qty); else S.lines.push({n:l.n,qty:l.qty,opt:l.opt||"",side:l.side||"",drink:l.drink||"",note:l.note||""});
+  changed();
+}
+function renderMine(){
+  const el=$("mineBody"); el.replaceChildren();
+  const ed=canEditMine();
+  $("myName").disabled=!ed;
+  if(S.readOnly) el.append(h("div",{class:"banner",style:"margin-bottom:10px"},"You can view this page but can't save an order on it. Build your order here, tap “Copy my order”, and send it to Jingwen on WhatsApp."));
+  if(!S.lines.length){ el.append(h("div",{class:"empty"},h("strong",null,"Nothing added yet"),"Pick items from the menu. Burgers, McSpicy, nuggets and wraps can be made a meal with your choice of side and drink.")); }
+  else{
+    const L=h("div",{class:"lines"});
+    S.lines.forEach((l,ix)=>{
+      const o=optText(l);
+      L.append(h("div",{class:"line"},
+        h("div",{class:"qty"},h("button",{"aria-label":"Less",disabled:!ed,onclick:()=>{l.qty--; if(l.qty<1) S.lines.splice(ix,1); changed();}},"−"),h("span",null,l.qty),h("button",{"aria-label":"More",disabled:!ed,onclick:()=>{l.qty=Math.min(20,l.qty+1);changed();}},"+")),
+        h("div",{style:"min-width:0"},h("div",{class:"t"},l.n),o?h("div",{class:"o"},o):null),
+        h("button",{class:"x","aria-label":"Remove "+l.n,disabled:!ed,onclick:()=>{S.lines.splice(ix,1);changed();}},"×"),
+        h("input",{class:"note",id:"note-"+ix,type:"text",maxlength:"80",placeholder:"Add a note (no ice, extra sauce…)",value:l.note||"",disabled:!ed,oninput:e=>{l.note=e.target.value;queueSave();}})
+      ));
+    });
+    el.append(L);
+  }
+  const n=S.lines.reduce((a,l)=>a+l.qty,0); $("nMine").textContent=n;
+  $("clearMine").disabled=!ed||!S.lines.length; $("copyMine").disabled=!S.lines.length;
+  const ss=$("saveState"); ss.textContent=S.save; ss.className="save"+(S.save==="Saved"?" ok":S.save.startsWith("Couldn")?" err":"");
+}
+function changed(){ renderMine(); renderMenu(); queueSave(); }
+
+
+async function api(path,method,body){
+  const r=await fetch("/api/"+path,{method:method||"GET",headers:body?{"content-type":"application/json"}:{},body:body?JSON.stringify(body):undefined,cache:"no-store"});
+  let d={}; try{ d=await r.json(); }catch(e){}
+  if(!r.ok){ const e=new Error(d.error||("HTTP "+r.status)); e.status=r.status; throw e; }
+  return d;
+}
+let saveTimer=null;
+function queueSave(){ S.save="Saving…"; renderSaveOnly(); clearTimeout(saveTimer); saveTimer=setTimeout(flush,700); }
+function renderSaveOnly(){ const ss=$("saveState"); ss.textContent=S.save; ss.className="save"+(S.save==="Saved"?" ok":/^(Couldn|Orders)/.test(S.save)?" err":""); }
+async function flush(){
+  if(S.saving){ S.pending=true; return; }
+  S.saving=true;
+  const items=S.lines.map(l=>({n:l.n,qty:l.qty,opt:l.opt||"",side:l.side||"",drink:l.drink||"",note:(l.note||"").trim()}));
+  const name=S.name.trim();
+  try{
+    if(!items.length && !name) await api("order","DELETE",{id:UID,token:TOKEN,orgPin:ORGPIN||undefined});
+    else await api("order","PUT",{id:UID,token:TOKEN,name,items,orgPin:ORGPIN||undefined});
+    S.save="Saved"; refresh();
+  }catch(e){
+    S.save = e.status===423 ? "Orders are closed, so this change wasn't saved." : e.status===403 ? "Couldn't save: this order belongs to another device." : "Couldn't save. Check your connection; it will retry on your next change.";
+  }
+  S.saving=false; renderSaveOnly();
+  if(S.pending){ S.pending=false; flush(); }
+}
+/* ---------- group ---------- */
+function aggregate(orders){
+  const m=new Map();
+  orders.forEach(o=>(o.items||[]).forEach(l=>{ const k=lineKey(l); if(!m.has(k)) m.set(k,{n:l.n,opt:l.opt,side:l.side,drink:l.drink,qty:0,who:[]}); const a=m.get(k); a.qty+=l.qty; a.who.push((o.name||"Someone")+(l.qty>1?" ×"+l.qty:"")+(l.note?" ("+l.note+")":"")); }));
+  const order=ITEMS.map(i=>i.n);
+  const ix=n=>{const i=order.indexOf(n);return i<0?9999:i;};
+  return [...m.values()].sort((a,b)=>ix(a.n)-ix(b.n) || (a.opt||"").localeCompare(b.opt||""));
+}
+function groupOrders(){ return S.orders.filter(o=>(o.items||[]).length); }
+function renderOwner(){
+  const el=$("ownerBox"); el.replaceChildren();
+  if(!S.isOwner) return;
+  const d=cutoffDate();
+  const pad=n=>String(n).padStart(2,"0");
+  const val=d?`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`:"";
+  const inp=h("input",{id:"cutoff",type:"datetime-local",value:val});
+  el.append(h("div",{class:"owner"},
+    h("span",{class:"lbl"},"Organiser controls"),
+    h("label",{class:"fld",for:"cutoff"},"Cut-off",inp),
+    h("button",{class:"btn",onclick:()=>saveConfig({cutoff:inp.value?new Date(inp.value).toISOString():""})},"Set cut-off"),
+    h("button",{class:"btn "+(S.config.locked?"primary":""),onclick:()=>saveConfig({locked:!S.config.locked})},S.config.locked?"Reopen orders":"Close orders now"),
+    h("button",{class:"btn",onclick:()=>{ ORGPIN=null; S.isOwner=false; try{sessionStorage.removeItem("4x-org");}catch(e){} renderAll(); }},"Sign out of organiser")));
+}
+async function saveConfig(patch){
+  try{ const d=await api("config","POST",{orgPin:ORGPIN,...patch}); S.config=d.config; toast(patch.locked!==undefined?(d.config.locked?"Orders closed":"Orders reopened"):"Cut-off saved"); renderAll(); refresh(); }
+  catch(e){ toast(e.status===403?"Organiser PIN no longer valid. Sign in again.":"Couldn't save that. Try again."); }
+}
+function organiser(){
+  const layer=$("layer"); const close=()=>layer.replaceChildren();
+  const setting=!S.hasPin;
+  const pin=h("input",{id:"orgPin",type:"password",inputmode:"numeric",maxlength:"12",autocomplete:"off",placeholder:setting?"Choose 4 to 12 digits":"Organiser PIN"});
+  const msg=h("div",{style:"color:var(--bad);font-size:13px",hidden:true});
+  const go=async()=>{ const v=pin.value.trim(); if(!/^\d{4,12}$/.test(v)){ msg.textContent="Use 4 to 12 digits."; msg.hidden=false; return; }
+    try{ await api("organiser","POST",{pin:v,setup:setting}); ORGPIN=v; S.isOwner=true; S.hasPin=true; try{sessionStorage.setItem("4x-org",v);}catch(e){} close(); toast(setting?"Organiser PIN set":"Organiser mode on"); renderAll(); }
+    catch(e){ msg.textContent=e.status===403?"That PIN isn't right.":e.status===409?"A PIN was already set. Enter it instead.":"Couldn't check the PIN. Try again."; msg.hidden=false; if(e.status===409){ S.hasPin=true; } } };
+  pin.addEventListener("keydown",e=>{ if(e.key==="Enter") go(); });
+  const ov=h("div",{class:"overlay",onclick:e=>{if(e.target===ov)close();}},
+    h("div",{class:"sheet",role:"dialog","aria-modal":"true","aria-label":"Organiser"},
+      h("h3",null,setting?"Set the organiser PIN":"Organiser sign-in"),
+      h("div",{style:"color:var(--muted);font-size:13px"},setting?"Only people with this PIN can set the cut-off, close orders and remove entries. Share it with Jingwen only.":"For setting the cut-off, closing orders and removing entries."),
+      h("label",{class:"fld",for:"orgPin"},"PIN",pin), msg,
+      h("div",{class:"row"},h("span",{style:"flex:1"}),h("button",{class:"btn",onclick:close},"Cancel"),h("button",{class:"btn primary",onclick:go},setting?"Set PIN":"Sign in"))));
+  layer.replaceChildren(ov); pin.focus();
+  ov.addEventListener("keydown",e=>{ if(e.key==="Escape") close(); });
+}
+function renderGroup(){
+  const el=$("groupBody"); el.replaceChildren();
+  const os=groupOrders(); const agg=aggregate(os);
+  const total=agg.reduce((a,x)=>a+x.qty,0);
+  $("nGroup").textContent=os.length;
+  $("groupSub").textContent= os.length? `${os.length} ${os.length===1?"person":"people"} · ${total} items` : "";
+  $("copyAll").disabled=!agg.length;
+  if(!S.loaded) el.append(h("div",{class:"banner"}, S.offline?"The group list can't be reached right now. It will appear once the connection is back.":"Loading the group list…"));
+  else if(S.offline) el.append(h("div",{class:"banner",style:"margin-bottom:10px"},"Connection lost. Showing the last list loaded; it refreshes once you're back online."));
+  if(S.loaded && !agg.length){ el.append(h("div",{class:"empty"},h("strong",null,"No orders yet"),"As people add items, the combined list builds up here for Jingwen to key into McDelivery.")); return; }
+  if(!agg.length) return;
+  const t=h("div",{class:"ticket"},
+    h("div",{class:"tstat"},h("span",null,h("b",null,total)," items"),h("span",null,h("b",null,os.length)," people"),h("span",null,h("b",null,agg.length)," lines")));
+  agg.forEach(a=>{ const o=optText(a);
+    t.append(h("div",{class:"trow"},h("span",{class:"c"},a.qty+"×"),h("span",{class:"d"},a.n+(o?" · "+o:"")),h("span",{class:"w"},a.who.join(", "))));
+  });
+  el.append(t);
+  const P=h("div",{class:"people"},h("div",{class:"cat-title",style:"margin:0"},"By person"));
+  os.slice().sort((a,b)=>(a.name||"").localeCompare(b.name||"")).forEach(o=>{
+    const mine=o.id===S.uid; const n=(o.items||[]).reduce((a,l)=>a+l.qty,0);
+    let rm=null;
+    if(S.isOwner && !mine){ const c=S.confirmDel===o.id;
+      rm=h("button",{class:"mini"+(c?" confirm":""),onclick:async()=>{ if(!c){S.confirmDel=o.id;renderGroup();return;} S.confirmDel=null; try{await api("order","DELETE",{id:o.id,orgPin:ORGPIN});toast("Removed");refresh();}catch(e){toast("Couldn't remove. Try again.");} }},c?"Tap again to remove":"Remove"); }
+    P.append(h("div",{class:"person"},
+      h("div",{class:"ph"},h("b",null,o.name||"No name given"),mine?h("span",{class:"me-tag"},"You"):null,h("small",null,n+(n===1?" item":" items")),h("span",{class:"sp"},rm)),
+      h("ul",null,(o.items||[]).map(l=>{ const ot=optText(l); return h("li",null,l.qty+"× "+l.n, ot||l.note?h("span",null," — "+[ot,l.note].filter(Boolean).join(" · ")):null); }))));
+  });
+  el.append(P);
+}
+
+/* ---------- copy ---------- */
+function orderText(os){
+  const agg=aggregate(os); const total=agg.reduce((a,x)=>a+x.qty,0);
+  const out=[`4X Monday Lunch · McDelivery order`,`${os.length} ${os.length===1?"person":"people"}, ${total} items`,""];
+  agg.forEach(a=>{ const o=optText(a); out.push(`${a.qty}× ${a.n}${o?" ("+o+")":""}`); });
+  out.push("","By person:");
+  os.forEach(o=>{ out.push(`• ${o.name||"No name"}: `+(o.items||[]).map(l=>{ const ot=optText(l); const ex=[ot,l.note].filter(Boolean).join(", "); return `${l.qty}× ${l.n}${ex?" ("+ex+")":""}`; }).join("; ")); });
+  return out.join("\n");
+}
+function mineText(){ const nm=S.name.trim()||"Me"; return `4X Monday Lunch order for ${nm}:\n`+S.lines.map(l=>{ const ot=optText(l); const ex=[ot,l.note].filter(Boolean).join(", "); return `${l.qty}× ${l.n}${ex?" ("+ex+")":""}`; }).join("\n"); }
+function copy(text){
+  const fallback=()=>{ const ta=h("textarea",{class:"copybox",id:"copybox",readonly:true}); ta.value=text;
+    const layer=$("layer"); const close=()=>layer.replaceChildren();
+    const ov=h("div",{class:"overlay",onclick:e=>{if(e.target===ov)close();}},h("div",{class:"sheet",role:"dialog","aria-modal":"true"},h("h3",null,"Copy this text"),h("div",{style:"color:var(--muted);font-size:13px"},"Your browser blocked automatic copying. The text is selected; press Ctrl+C or long-press to copy."),ta,h("div",{class:"row"},h("span",{style:"flex:1"}),h("button",{class:"btn primary",onclick:close},"Done"))));
+    layer.replaceChildren(ov); ta.focus(); ta.select(); };
+  try{ navigator.clipboard.writeText(text).then(()=>toast("Copied"),fallback); }catch(e){ fallback(); }
+}
+
+/* ---------- tabs & inputs ---------- */
+function setPane(p){ S.pane=p; document.querySelectorAll("#tabs button").forEach(b=>b.setAttribute("aria-selected",String(b.dataset.p===p))); ["menu","mine","group"].forEach(x=>$("p-"+x).classList.toggle("active",x===p)); }
+$("tabs").addEventListener("click",e=>{ const b=e.target.closest("button[data-p]"); if(b) setPane(b.dataset.p); });
+$("q").addEventListener("input",e=>{ S.q=e.target.value; renderMenu(); });
+$("myName").addEventListener("input",e=>{ S.name=e.target.value; queueSave(); });
+$("clearMine").addEventListener("click",()=>{ S.lines=[]; changed(); });
+$("copyMine").addEventListener("click",()=>copy(mineText()));
+$("copyAll").addEventListener("click",()=>copy(orderText(groupOrders())));
+
+
+function renderAll(){ renderStatus(); renderCats(); renderMenu(); renderMine(); renderGroup(); renderOwner(); renderOrgBtn(); }
+function renderOrgBtn(){ const b=$("orgBtn"); b.hidden=S.isOwner; }
+$("orgBtn").addEventListener("click",organiser);
+
+let first=true;
+async function refresh(){
+  try{
+    const d=await api("state");
+    S.orders=d.orders||[]; S.config=d.config||{}; S.hasPin=!!d.hasPin; S.loaded=true; S.offline=false;
+    if(first){ first=false; const mine=S.orders.find(o=>o.id===UID);
+      if(mine && !S.lines.length){ S.lines=(mine.items||[]).map(l=>({...l})); if(mine.name){ S.name=mine.name; $("myName").value=mine.name; } S.save="Saved"; }
+      renderAll(); return; }
+  }catch(e){ S.offline=true; }
+  renderStatus(); renderGroup(); renderOwner();
+  const typing=document.activeElement&&(document.activeElement.classList.contains("note")||document.activeElement.id==="myName");
+  if(!typing){ renderMine(); renderMenu(); }
+}
+renderAll();
+try{ const n=store("4x-name"); if(n){ S.name=n; $("myName").value=n; } }catch(e){}
+$("myName").addEventListener("change",()=>store("4x-name",S.name.trim()));
+refresh();
+setInterval(()=>{ if(!document.hidden) refresh(); },15000);
+document.addEventListener("visibilitychange",()=>{ if(!document.hidden) refresh(); });
+setInterval(()=>{ const now=isClosed(); if(S._closed!==now){ S._closed=now; renderStatus(); renderMenu(); renderMine(); } },30000);
+})();
+</script>
+</body>
+</html>
