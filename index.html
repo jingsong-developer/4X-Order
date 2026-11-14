@@ -12,7 +12,9 @@ html,body{margin:0} [hidden]{display:none!important} img{max-width:100%}
 
 /* Layout: one-screen app. Three panes (Menu · My order · Group tally) side by side on wide screens,
    tabbed on narrow ones. Each pane scrolls inside itself under a frozen header. Tally = kitchen tickets. */
+/* --badge: space kept clear at the bottom for the host badge */
 :root{
+  --badge:64px;
   --bg:#F3F4F8; --panel:#FFFFFF; --ink:#1A1E2C; --muted:#646B80; --line:#E2E5EE;
   --accent:#D9480F; --accent-ink:#FFFFFF; --accent-soft:#FDEBE2;
   --amber:#B7791F; --amber-soft:#FBF1DC; --ok:#2F855A; --ok-soft:#E3F3EA; --bad:#C53030; --bad-soft:#FBE4E4;
@@ -37,7 +39,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:1
 button,input,select,textarea{font:inherit;color:inherit}
 button{cursor:pointer}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.app{height:100%;display:flex;flex-direction:column;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:14px;gap:12px;max-width:1440px;margin:0 auto}
+.app{height:100%;display:flex;flex-direction:column;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-top:14px;padding-bottom:calc(var(--badge) + env(safe-area-inset-bottom,0px));gap:12px;max-width:1440px;margin:0 auto}
 header.top{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
 .brand{display:flex;align-items:baseline;gap:10px;min-width:0}
 .brand h1{font-family:var(--f-display);font-weight:800;font-size:26px;margin:0;letter-spacing:-.01em}
@@ -125,12 +127,12 @@ label.fld input,label.fld select,label.fld textarea{padding:8px 10px;border:1px 
 .owner input{padding:6px 8px;border:1px solid var(--line);border-radius:7px;background:var(--panel);color:var(--ink);font-size:13px}
 .banner{padding:9px 12px;border-radius:9px;font-size:13px;background:var(--amber-soft);color:var(--ink);border:1px solid var(--line)}
 .banner.bad{background:var(--bad-soft)}
-.overlay{position:fixed;inset:0;background:rgba(10,12,20,.45);display:grid;place-items:end center;z-index:50;padding:16px;padding-bottom:max(16px,env(safe-area-inset-bottom,0px))}
+.overlay{position:fixed;inset:0;background:rgba(10,12,20,.45);display:grid;place-items:end center;z-index:50;padding:16px;padding-bottom:calc(var(--badge) + env(safe-area-inset-bottom,0px))}
 @media (min-width:640px){.overlay{place-items:center}}
 .sheet{background:var(--panel);border-radius:14px;width:min(440px,100%);padding:16px;display:flex;flex-direction:column;gap:12px;box-shadow:0 10px 40px rgba(0,0,0,.3);max-height:90%;overflow:auto}
 .sheet h3{margin:0;font-family:var(--f-display);font-weight:600;font-size:19px;text-wrap:balance}
 .sheet .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-.toast{position:fixed;left:50%;bottom:max(18px,calc(env(safe-area-inset-bottom,0px) + 12px));transform:translateX(-50%);background:var(--ink);color:var(--panel);padding:8px 14px;border-radius:8px;font-size:13px;font-weight:500;z-index:60;box-shadow:var(--shadow)}
+.toast{position:fixed;left:50%;bottom:calc(var(--badge) + 8px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--panel);padding:8px 14px;border-radius:8px;font-size:13px;font-weight:500;z-index:60;box-shadow:var(--shadow)}
 textarea.copybox{width:100%;min-height:160px;font-family:var(--f-mono);font-size:12px;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg)}
 @media (max-width:1000px){
   .tabs{display:flex}
